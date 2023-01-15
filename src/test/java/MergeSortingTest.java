@@ -5,7 +5,8 @@ public class MergeSortingTest {
     @Test
     public void testSortInitializeDataIntAsc() {
         MergeSorting sort = new MergeSorting();
-        sort.initializeData("-i -a out.txt in.txt");
+        String[] arg = {"-i", "-a", "out.txt", "in.txt"};
+        sort.initializeData(arg);
 
         Assert.assertEquals(sort.getSortType(), "-a", "Incorrect sorting mode");
         Assert.assertEquals(sort.getDataType(), "-i", "Incorrect data type");
@@ -17,7 +18,8 @@ public class MergeSortingTest {
     @Test
     public void testSortInitializeDataStr() {
         MergeSorting sort = new MergeSorting();
-        sort.initializeData("-s out.txt in1.txt in2.txt in3.txt");
+        String[] arg = {"-s", "out.txt", "in1.txt", "in2.txt", "in3.txt"};
+        sort.initializeData(arg);
 
         Assert.assertEquals(sort.getSortType(), "-a", "Incorrect sorting mode");
         Assert.assertEquals(sort.getDataType(), "-s", "Incorrect data type");
@@ -31,7 +33,8 @@ public class MergeSortingTest {
     @Test
     public void testSortInitializeDataDescStr() {
         MergeSorting sort = new MergeSorting();
-        sort.initializeData("-d -s out.txt in1.txt in2.txt");
+        String[] arg = {"-d", "-s", "out.txt", "in1.txt", "in2.txt"};
+        sort.initializeData(arg);
 
         Assert.assertEquals(sort.getSortType(), "-d", "Incorrect sorting mode");
         Assert.assertEquals(sort.getDataType(), "-s", "Incorrect data type");
