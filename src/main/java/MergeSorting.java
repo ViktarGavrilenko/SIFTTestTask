@@ -10,8 +10,9 @@ public class MergeSorting {
     private final static String ARG_S = "-s";
     private final static String ARG_I = "-i";
     private final static String TEMP_DIR = "temp";
-    private final static int NUMBER_OF_LINES_IN_PART_FILE = 89;
-    private final static int NUMBER_OF_LINES_IN_FILE = 500;
+    private final static int NUMBER_OF_LINES_IN_PART_FILE = 7;
+    private final static int NUMBER_OF_LINES_IN_FILE = 200;
+
 
     private String sortType = ARG_A;
     private String dataType;
@@ -44,8 +45,8 @@ public class MergeSorting {
         if (sort.dataType.equals(ARG_S)) {
             sort.createStringFile();
         }
-        sort.getFile(sort.inFiles);
 
+        sort.getFile(sort.inFiles);
     }
 
     public void setArg(String arg) {
@@ -83,21 +84,17 @@ public class MergeSorting {
     public void getFile(List<String> inFiles) {
         createDir(TEMP_DIR);
         for (String inFile : inFiles) {
-            try {
-                LinkedList<String> partOfFile;
-                Iterator<String> file;
-                try (BufferedReader reader = new BufferedReader(new FileReader(inFile))) {
-                    partOfFile = new LinkedList<>();
-                    file = reader.lines().iterator();
-                    while (file.hasNext()) {
-                        partOfFile.add(file.next());
-                        if (partOfFile.size() >= NUMBER_OF_LINES_IN_PART_FILE || !file.hasNext()) {
-                            if (sortType.equals(ARG_D)) {
-                                Collections.reverse(partOfFile);
-                            }
-                            createPartOfFile(partOfFile, inFile);
-                            partOfFile.clear();
+            try (BufferedReader reader = new BufferedReader(new FileReader(inFile))) {
+                LinkedList<String> partOfFile = new LinkedList<>();
+                Iterator<String> file = reader.lines().iterator();
+                while (file.hasNext()) {
+                    partOfFile.add(file.next());
+                    if (partOfFile.size() >= NUMBER_OF_LINES_IN_PART_FILE || !file.hasNext()) {
+                        if (sortType.equals(ARG_D)) {
+                            Collections.reverse(partOfFile);
                         }
+                        createPartOfFile(partOfFile, inFile);
+                        partOfFile.clear();
                     }
                 }
             } catch (IOException e) {
@@ -158,8 +155,7 @@ public class MergeSorting {
             }
             Collections.sort(list);
 
-            try {
-                FileWriter writer = new FileWriter(inFile, true);
+            try (FileWriter writer = new FileWriter(inFile, true)) {
                 for (Integer line : list) {
                     writer.write(String.valueOf(line) + '\n');
                 }
