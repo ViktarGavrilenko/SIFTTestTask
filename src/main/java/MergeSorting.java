@@ -1,19 +1,22 @@
-import java.io.BufferedReader;
-import java.io.FileReader;
-import java.io.FileWriter;
-import java.io.IOException;
+import java.io.*;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 
 public class MergeSorting {
-    private String sortType = "-a";
+    private final static String ARG_A = "-a";
+    private final static String ARG_D = "-d";
+    private final static String ARG_S = "-s";
+    private final static String ARG_I = "-i";
+    private final static String TEMP_DIR = "temp";
+    private final static int NUMBER_OF_LINES_IN_PART_FILE = 89;
+    private final static int NUMBER_OF_LINES_IN_FILE = 500;
+
+    private String sortType = ARG_A;
     private String dataType;
     private String outFile;
     private List<String> inFiles;
-
-    private final static String TEMP_DIR = "temp";
-    private final static int NUMBER_OF_LINES_IN_FILE = 1000;
 
     public String getSortType() {
         return sortType;
@@ -35,23 +38,11 @@ public class MergeSorting {
         MergeSorting sort = new MergeSorting();
         sort.initializeData(args);
 
-        for (int i = 0; i < sort.inFiles.size(); i++) {
-            List<Long> list = new ArrayList<>();
-            for (int j = 0; j < 4000; j++) {
-                final Random random = new Random();
-                list.add(random.nextLong());
-            }
-            Collections.sort(list);
-
-            try (FileWriter writer = new FileWriter(sort.inFiles.get(i), true)) {
-                for (Long aLong : list) {
-                    writer.write(String.valueOf(aLong) + '\n');
-                }
-            } catch (IOException ex) {
-                System.out.println(ex.getMessage());
-            }
-
-            System.out.println(sort.readFile(sort.inFiles.get(i)));
+        if (sort.dataType.equals(ARG_I)) {
+            sort.createIntegerFile();
+        }
+        if (sort.dataType.equals(ARG_S)) {
+            sort.createStringFile();
         }
         sort.getFile(sort.inFiles);
 
@@ -59,8 +50,14 @@ public class MergeSorting {
 
     public void setArg(String arg) {
         switch (arg) {
-            case "-a", "-d" -> sortType = arg;
-            case "-i", "-s" -> dataType = arg;
+            case ARG_A:
+            case ARG_D:
+                sortType = arg;
+                break;
+            case ARG_I:
+            case ARG_S:
+                dataType = arg;
+                break;
         }
     }
 
@@ -84,64 +81,59 @@ public class MergeSorting {
     }
 
     public void getFile(List<String> inFiles) {
-        List<Iterator<String>> iterators = new ArrayList<>();
         createDir(TEMP_DIR);
         for (String inFile : inFiles) {
             try {
-                BufferedReader reader = new BufferedReader(new FileReader(inFile));
-                LinkedList<String> partOfFile = new LinkedList<>();
-                String element = reader.readLine();
-
-                while (element != null) {
-                    partOfFile.add(element);
-                    element = reader.readLine();
-                    if (partOfFile.size() >= NUMBER_OF_LINES_IN_FILE || element == null) {
-                        createPartOfFile(partOfFile, inFile);
-                        iterators.add(new LinkedList<>(partOfFile).iterator());
-                        partOfFile.clear();
+                LinkedList<String> partOfFile;
+                Iterator<String> file;
+                try (BufferedReader reader = new BufferedReader(new FileReader(inFile))) {
+                    partOfFile = new LinkedList<>();
+                    file = reader.lines().iterator();
+                    while (file.hasNext()) {
+                        partOfFile.add(file.next());
+                        if (partOfFile.size() >= NUMBER_OF_LINES_IN_PART_FILE || !file.hasNext()) {
+                            if (sortType.equals(ARG_D)) {
+                                Collections.reverse(partOfFile);
+                            }
+                            createPartOfFile(partOfFile, inFile);
+                            partOfFile.clear();
+                        }
                     }
                 }
-
-//                iterators.add(reader.lines().iterator());
             } catch (IOException e) {
                 System.out.println(e.getMessage());
             }
         }
 
-        List<Long> minValues = new ArrayList<>();
-        for (Iterator<String> iterator : iterators) {
-            if (iterator.hasNext()) {
-                minValues.add(Long.valueOf(iterator.next()));
+        List<Iterator<String>> iterators = new LinkedList<>();
+
+        File dir = new File(TEMP_DIR);
+        File[] arrFiles = dir.listFiles();
+        if (arrFiles != null) {
+            for (File file : arrFiles) {
+                try {
+                    BufferedReader reader = new BufferedReader(new FileReader(file));
+                    iterators.add(reader.lines().iterator());
+                } catch (IOException e) {
+                    System.out.println(e.getMessage());
+                }
             }
         }
 
-        while (minValues.size() > 0) {
-            Long minValue = Collections.min(minValues);
-            for (int i = 0; i < minValues.size(); i++) {
-                if (minValues.get(i).equals(minValue)) {
-//                    resultArray.add(minValues.get(i));
-                    try (FileWriter writer = new FileWriter(outFile, true)) {
-                        writer.write(String.valueOf(minValues.get(i)) + '\n');
-                    } catch (IOException ex) {
-                        System.out.println(ex.getMessage());
-                    }
-                    if (iterators.get(i).hasNext()) {
-                        minValues.set(i, Long.valueOf(iterators.get(i).next()));
-                    } else {
-                        minValues.remove(i);
-                        iterators.remove(i);
-                    }
-                }
-            }
+        if (dataType.equals(ARG_I)) {
+            sortIntegerFile(iterators);
+        } else {
+            sortStringFile(iterators);
         }
     }
 
     public void createDir(String dirName) {
-        if (!Files.exists(Paths.get(dirName))) {
+        Path of = Path.of(dirName);
+        if (!Files.exists(of)) {
             try {
-                Files.createDirectory(Paths.get(dirName));
+                Files.createDirectory(of);
             } catch (IOException e) {
-                System.err.println(e);
+                System.err.println("Directory creation error. " + e);
             }
         }
     }
@@ -154,6 +146,123 @@ public class MergeSorting {
             }
         } catch (IOException ex) {
             System.out.println(ex.getMessage());
+        }
+    }
+
+    public void createIntegerFile() {
+        for (String inFile : inFiles) {
+            List<Integer> list = new ArrayList<>();
+            for (int j = 0; j < NUMBER_OF_LINES_IN_FILE; j++) {
+                final Random random = new Random();
+                list.add(random.nextInt(Integer.MAX_VALUE));
+            }
+            Collections.sort(list);
+
+            try {
+                FileWriter writer = new FileWriter(inFile, true);
+                for (Integer line : list) {
+                    writer.write(String.valueOf(line) + '\n');
+                }
+            } catch (IOException ex) {
+                System.out.println(ex.getMessage());
+            }
+        }
+    }
+
+    public void createStringFile() {
+        for (String inFile : inFiles) {
+            List<String> list = new ArrayList<>();
+            for (int j = 0; j < NUMBER_OF_LINES_IN_FILE; j++) {
+                final Random random = new Random();
+                StringBuilder line = new StringBuilder();
+                for (int k = 0; k < 21 - random.nextInt(20); k++) {
+                    char c = (char) (random.nextInt(26) + 'a');
+                    if (random.nextInt(3) == 2) {
+                        line.append(String.valueOf(c).toUpperCase());
+                    } else {
+                        line.append(c);
+                    }
+                }
+                list.add(line.toString());
+
+            }
+            Collections.sort(list);
+
+            try (FileWriter writer = new FileWriter(inFile, true)) {
+                for (String line : list) {
+                    writer.write(line + '\n');
+                }
+            } catch (IOException ex) {
+                System.out.println(ex.getMessage());
+            }
+        }
+    }
+
+    public void sortIntegerFile(List<Iterator<String>> iterators) {
+        List<Long> values = new ArrayList<>();
+        for (Iterator<String> iterator : iterators) {
+            if (iterator.hasNext()) {
+                values.add(Long.valueOf(iterator.next()));
+            }
+        }
+
+        while (values.size() > 0) {
+            String value;
+            if (sortType.equals(ARG_D)) {
+                value = String.valueOf(Collections.max(values));
+            } else {
+                value = String.valueOf(Collections.min(values));
+            }
+
+            for (int i = 0; i < values.size(); i++) {
+                if (String.valueOf(values.get(i)).equals(value)) {
+                    try (FileWriter writer = new FileWriter(outFile, true)) {
+                        writer.write(String.valueOf(values.get(i)) + '\n');
+                    } catch (IOException ex) {
+                        System.out.println(ex.getMessage());
+                    }
+                    if (iterators.get(i).hasNext()) {
+                        values.set(i, Long.valueOf(iterators.get(i).next()));
+                    } else {
+                        values.remove(i);
+                        iterators.remove(i);
+                    }
+                }
+            }
+        }
+    }
+
+    public void sortStringFile(List<Iterator<String>> iterators) {
+        List<String> values = new ArrayList<>();
+        for (Iterator<String> iterator : iterators) {
+            if (iterator.hasNext()) {
+                values.add(iterator.next());
+            }
+        }
+
+        while (values.size() > 0) {
+            String value;
+            if (sortType.equals(ARG_D)) {
+                value = Collections.max(values);
+            } else {
+                value = Collections.min(values);
+            }
+
+            for (int i = 0; i < values.size(); i++) {
+                if (String.valueOf(values.get(i)).equals(value)) {
+                    try (FileWriter writer = new FileWriter(outFile, true)) {
+                        writer.write(String.valueOf(values.get(i)) + '\n');
+                    } catch (IOException ex) {
+                        System.out.println(ex.getMessage());
+                    }
+                    if (iterators.get(i).hasNext()) {
+                        values.set(i, iterators.get(i).next());
+                    } else {
+                        values.remove(i);
+                        iterators.remove(i);
+                    }
+                }
+            }
         }
     }
 }
