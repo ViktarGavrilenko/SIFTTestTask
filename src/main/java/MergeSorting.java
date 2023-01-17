@@ -1,7 +1,6 @@
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.*;
 
 public class MergeSorting {
@@ -11,8 +10,7 @@ public class MergeSorting {
     private final static String ARG_I = "-i";
     private final static String TEMP_DIR = "temp";
     private final static int NUMBER_OF_LINES_IN_PART_FILE = 7;
-    private final static int NUMBER_OF_LINES_IN_FILE = 200;
-
+    private final static int NUMBER_OF_LINES_IN_FILE = 400;
 
     private String sortType = ARG_A;
     private String dataType;
@@ -46,7 +44,7 @@ public class MergeSorting {
             sort.createStringFile();
         }
 
-        sort.getFile(sort.inFiles);
+        sort.createSortedFile(sort.inFiles);
     }
 
     public void setArg(String arg) {
@@ -72,51 +70,9 @@ public class MergeSorting {
         inFiles = new ArrayList<>(Arrays.asList(data).subList(initialIndex, data.length));
     }
 
-    public List<String> readFile(String fineName) {
-        try {
-            return Files.readAllLines(Paths.get(fineName));
-        } catch (IOException e) {
-            System.out.println("Error reading file " + fineName + ". " + e);
-            throw new RuntimeException(e);
-        }
-    }
-
-    public void getFile(List<String> inFiles) {
-        createDir(TEMP_DIR);
-        for (String inFile : inFiles) {
-            try (BufferedReader reader = new BufferedReader(new FileReader(inFile))) {
-                LinkedList<String> partOfFile = new LinkedList<>();
-                Iterator<String> file = reader.lines().iterator();
-                while (file.hasNext()) {
-                    partOfFile.add(file.next());
-                    if (partOfFile.size() >= NUMBER_OF_LINES_IN_PART_FILE || !file.hasNext()) {
-                        if (sortType.equals(ARG_D)) {
-                            Collections.reverse(partOfFile);
-                        }
-                        createPartOfFile(partOfFile, inFile);
-                        partOfFile.clear();
-                    }
-                }
-            } catch (IOException e) {
-                System.out.println(e.getMessage());
-            }
-        }
-
-        List<Iterator<String>> iterators = new LinkedList<>();
-
-        File dir = new File(TEMP_DIR);
-        File[] arrFiles = dir.listFiles();
-        if (arrFiles != null) {
-            for (File file : arrFiles) {
-                try {
-                    BufferedReader reader = new BufferedReader(new FileReader(file));
-                    iterators.add(reader.lines().iterator());
-                } catch (IOException e) {
-                    System.out.println(e.getMessage());
-                }
-            }
-        }
-
+    public void createSortedFile(List<String> inFiles) {
+        splitFilesIntoParts(inFiles);
+        List<Iterator<String>> iterators = getIteratorsFromFiles();
         if (dataType.equals(ARG_I)) {
             sortIntegerFile(iterators);
         } else {
@@ -135,7 +91,7 @@ public class MergeSorting {
         }
     }
 
-    public void createPartOfFile(LinkedList<String> partOfFile, String nameFile) {
+    public void writePartOfFile(LinkedList<String> partOfFile, String nameFile) {
         try (FileWriter writer = new FileWriter(
                 TEMP_DIR + "//" + partOfFile.getFirst() + "!" + nameFile + "!" + partOfFile.getLast(), true)) {
             for (String s : partOfFile) {
@@ -260,5 +216,75 @@ public class MergeSorting {
                 }
             }
         }
+    }
+
+    public List<Iterator<String>> getIteratorsFromFiles() {
+        List<Iterator<String>> iterators = new LinkedList<>();
+
+        File dir = new File(TEMP_DIR);
+        File[] arrFiles = dir.listFiles();
+        if (arrFiles != null) {
+            for (File file : arrFiles) {
+                try {
+                    BufferedReader reader = new BufferedReader(new FileReader(file));
+                    iterators.add(reader.lines().iterator());
+                } catch (IOException e) {
+                    System.out.println(e.getMessage());
+                }
+            }
+        }
+        return iterators;
+    }
+
+    public void splitFilesIntoParts(List<String> inFiles) {
+        createDir(TEMP_DIR);
+        for (String inFile : inFiles) {
+            try (BufferedReader reader = new BufferedReader(new FileReader(inFile))) {
+                LinkedList<String> partOfFile = new LinkedList<>();
+                Iterator<String> file = reader.lines().iterator();
+                while (file.hasNext()) {
+                    String temp = file.next();
+
+                    if (!temp.contains(" ")) {
+                        if (!isCorrectData(partOfFile, temp)) {
+                            System.out.println("The input file " + inFile + " is incorrectly sorted. Line: " + temp);
+                            createPartOfFile(partOfFile, inFile);
+                            break;
+                        }
+                        partOfFile.add(temp);
+
+                        if (partOfFile.size() >= NUMBER_OF_LINES_IN_PART_FILE || !file.hasNext()) {
+                            createPartOfFile(partOfFile, inFile);
+                        }
+                    } else {
+                        System.out.println("The line '" + temp + "' in file " + inFile + " contains a space");
+                    }
+                }
+            } catch (IOException e) {
+                System.out.println(e.getMessage());
+            }
+        }
+    }
+
+    public boolean isCorrectData(LinkedList<String> partOfFile, String temp) {
+        if (partOfFile.size() > 0) {
+            if (dataType.equals(ARG_S)) {
+                if (partOfFile.getLast().compareTo(temp) > 0) {
+                    return false;
+                }
+            }
+            if (dataType.equals(ARG_I)) {
+                return Integer.parseInt(partOfFile.getLast()) <= Integer.parseInt(temp);
+            }
+        }
+        return true;
+    }
+
+    public void createPartOfFile(LinkedList<String> partOfFile, String inFile) {
+        if (sortType.equals(ARG_D)) {
+            Collections.reverse(partOfFile);
+        }
+        writePartOfFile(partOfFile, inFile);
+        partOfFile.clear();
     }
 }
