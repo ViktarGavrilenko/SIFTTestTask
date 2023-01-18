@@ -1,18 +1,17 @@
 import java.io.*;
-import java.nio.file.DirectoryNotEmptyException;
-import java.nio.file.Files;
-import java.nio.file.NoSuchFileException;
-import java.nio.file.Path;
 import java.util.*;
 
+import static utils.DataUtils.isCorrectData;
+import static utils.FileUtils.createDir;
+import static utils.FileUtils.deleteTempDir;
+
 public class MergeSorting {
-    private final static String ARG_A = "-a";
-    private final static String ARG_D = "-d";
-    private final static String ARG_S = "-s";
-    private final static String ARG_I = "-i";
-    private final static String TEMP_DIR = "temp";
-    private final static int NUMBER_OF_LINES_IN_PART_FILE = 7;
-    private final static int NUMBER_OF_LINES_IN_FILE = 400;
+    private static final String ARG_A = "-a";
+    private static final String ARG_D = "-d";
+    private static final String ARG_S = "-s";
+    private static final String ARG_I = "-i";
+    private static final String TEMP_DIR = "temp";
+    private static final int NUMBER_OF_LINES_IN_PART_FILE = 10000;
 
     private String sortType = ARG_A;
     private String dataType;
@@ -35,41 +34,7 @@ public class MergeSorting {
         return inFiles;
     }
 
-    public static void main(String[] args) {
-        MergeSorting sort = new MergeSorting();
-        sort.initializeData(args);
-        if (sort.dataType.equals(ARG_I)) {
-            sort.createIntegerFile();
-        }
-        if (sort.dataType.equals(ARG_S)) {
-            sort.createStringFile();
-        }
-        sort.createSortedFile(sort.inFiles);
-
-        sort.deleteTempDir();
-    }
-
-    public void deleteTempDir() {
-        File dir = new File(TEMP_DIR);
-        File[] arrFiles;
-        arrFiles = dir.listFiles();
-        if (arrFiles != null) {
-            for (File file : arrFiles) {
-                try {
-                    Files.delete(file.toPath());
-                } catch (NoSuchFileException x) {
-                    System.err.format("%s: no such" + " file or directory%n", file.getAbsolutePath());
-                } catch (DirectoryNotEmptyException x) {
-                    System.err.format("%s not empty%n", file.getAbsolutePath());
-                } catch (IOException x) {
-                    System.err.println(x);
-                }
-            }
-            dir.delete();
-        }
-    }
-
-    public void setArg(String arg) {
+    private void setArg(String arg) {
         switch (arg) {
             case ARG_A, ARG_D -> sortType = arg;
             case ARG_I, ARG_S -> dataType = arg;
@@ -87,6 +52,7 @@ public class MergeSorting {
     }
 
     public void createSortedFile(List<String> inFiles) {
+        deleteTempDir(TEMP_DIR);
         splitFilesIntoParts(inFiles);
         List<Iterator<String>> iterators = getIteratorsFromFiles();
         if (dataType.equals(ARG_I)) {
@@ -96,20 +62,9 @@ public class MergeSorting {
         }
     }
 
-    public void createDir(String dirName) {
-        Path of = Path.of(dirName);
-        if (!Files.exists(of)) {
-            try {
-                Files.createDirectory(of);
-            } catch (IOException e) {
-                System.err.println("Directory creation error. " + e);
-            }
-        }
-    }
-
-    public void writePartOfFile(LinkedList<String> partOfFile, String nameFile) {
-        try (FileWriter writer = new FileWriter(
-                TEMP_DIR + "//" + partOfFile.getFirst() + "!" + nameFile + "!" + partOfFile.getLast(), true)) {
+    private void writePartOfFile(LinkedList<String> partOfFile, String nameFile) {
+        try (FileWriter writer = new FileWriter(TEMP_DIR + "//" + partOfFile.getFirst() +
+                "!" + nameFile + "!" + partOfFile.getLast(), true)) {
             for (String s : partOfFile) {
                 writer.write(s + '\n');
             }
@@ -118,57 +73,9 @@ public class MergeSorting {
         }
     }
 
-    public void createIntegerFile() {
-        for (String inFile : inFiles) {
-            List<Integer> list = new ArrayList<>();
-            for (int j = 0; j < NUMBER_OF_LINES_IN_FILE; j++) {
-                final Random random = new Random();
-                list.add(random.nextInt(Integer.MAX_VALUE));
-            }
-            Collections.sort(list);
-
-            try (FileWriter writer = new FileWriter(inFile, true)) {
-                for (Integer line : list) {
-                    writer.write(String.valueOf(line) + '\n');
-                }
-            } catch (IOException ex) {
-                System.out.println(ex.getMessage());
-            }
-        }
-    }
-
-    public void createStringFile() {
-        for (String inFile : inFiles) {
-            List<String> list = new ArrayList<>();
-            for (int j = 0; j < NUMBER_OF_LINES_IN_FILE; j++) {
-                final Random random = new Random();
-                StringBuilder line = new StringBuilder();
-                for (int k = 0; k < 21 - random.nextInt(20); k++) {
-                    char c = (char) (random.nextInt(26) + 'a');
-                    if (random.nextInt(3) == 2) {
-                        line.append(String.valueOf(c).toUpperCase());
-                    } else {
-                        line.append(c);
-                    }
-                }
-                list.add(line.toString());
-
-            }
-            Collections.sort(list);
-
-            try (FileWriter writer = new FileWriter(inFile, true)) {
-                for (String line : list) {
-                    writer.write(line + '\n');
-                }
-            } catch (IOException ex) {
-                System.out.println(ex.getMessage());
-            }
-        }
-    }
-
-    public void sortIntegerFile(List<Iterator<String>> iterators) {
+    private void sortIntegerFile(List<Iterator<String>> iterators) {
         List<Integer> values = getValuesInt(iterators);
-        while (values.size() > 0) {
+        while (!values.isEmpty()) {
             String value;
             if (sortType.equals(ARG_D)) {
                 value = String.valueOf(Collections.max(values));
@@ -179,7 +86,7 @@ public class MergeSorting {
         }
     }
 
-    public List<Integer> getValuesInt(List<Iterator<String>> iterators) {
+    private List<Integer> getValuesInt(List<Iterator<String>> iterators) {
         List<Integer> values = new ArrayList<>();
         for (Iterator<String> iterator : iterators) {
             if (iterator.hasNext()) {
@@ -189,7 +96,7 @@ public class MergeSorting {
         return values;
     }
 
-    public void writeToFileInt(List<Integer> values, String value, List<Iterator<String>> iterators) {
+    private void writeToFileInt(List<Integer> values, String value, List<Iterator<String>> iterators) {
         for (int i = 0; i < values.size(); i++) {
             if (String.valueOf(values.get(i)).equals(value)) {
                 try (FileWriter writer = new FileWriter(outFile, true)) {
@@ -207,9 +114,9 @@ public class MergeSorting {
         }
     }
 
-    public void sortStringFile(List<Iterator<String>> iterators) {
+    private void sortStringFile(List<Iterator<String>> iterators) {
         List<String> values = getValuesStr(iterators);
-        while (values.size() > 0) {
+        while (!values.isEmpty()) {
             String value;
             if (sortType.equals(ARG_D)) {
                 value = Collections.max(values);
@@ -220,7 +127,7 @@ public class MergeSorting {
         }
     }
 
-    public List<String> getValuesStr(List<Iterator<String>> iterators) {
+    private List<String> getValuesStr(List<Iterator<String>> iterators) {
         List<String> values = new ArrayList<>();
         for (Iterator<String> iterator : iterators) {
             if (iterator.hasNext()) {
@@ -230,7 +137,7 @@ public class MergeSorting {
         return values;
     }
 
-    public void writeToFileStr(List<String> values, String value, List<Iterator<String>> iterators) {
+    private void writeToFileStr(List<String> values, String value, List<Iterator<String>> iterators) {
         for (int i = 0; i < values.size(); i++) {
             if (String.valueOf(values.get(i)).equals(value)) {
                 try (FileWriter writer = new FileWriter(outFile, true)) {
@@ -248,9 +155,8 @@ public class MergeSorting {
         }
     }
 
-    public List<Iterator<String>> getIteratorsFromFiles() {
+    private List<Iterator<String>> getIteratorsFromFiles() {
         List<Iterator<String>> iterators = new LinkedList<>();
-
         File dir = new File(TEMP_DIR);
         File[] arrFiles = dir.listFiles();
         if (arrFiles != null) {
@@ -266,7 +172,7 @@ public class MergeSorting {
         return iterators;
     }
 
-    public void splitFilesIntoParts(List<String> inFiles) {
+    private void splitFilesIntoParts(List<String> inFiles) {
         createDir(TEMP_DIR);
         for (String inFile : inFiles) {
             try (BufferedReader reader = new BufferedReader(new FileReader(inFile))) {
@@ -279,23 +185,7 @@ public class MergeSorting {
         }
     }
 
-    public boolean isCorrectData(String lastValue, String temp) {
-        if (lastValue != null) {
-            if (dataType.equals(ARG_S) && lastValue.compareTo(temp) > 0) {
-                return false;
-            }
-            if (dataType.equals(ARG_I)) {
-                return isInteger(temp) && Integer.parseInt(lastValue) <= Integer.parseInt(temp);
-            }
-        }
-        if (dataType.equals(ARG_I)) {
-            return isInteger(temp);
-        } else {
-            return true;
-        }
-    }
-
-    public void createPartOfFile(LinkedList<String> partOfFile, String inFile) {
+    private void createPartOfFile(LinkedList<String> partOfFile, String inFile) {
         if (sortType.equals(ARG_D)) {
             Collections.reverse(partOfFile);
         }
@@ -303,24 +193,15 @@ public class MergeSorting {
         partOfFile.clear();
     }
 
-    public static boolean isInteger(String str) {
-        try {
-            Integer.parseInt(str);
-            return true;
-        } catch (NumberFormatException e) {
-            return false;
-        }
-    }
-
-    public void splitFile(Iterator<String> file, LinkedList<String> partOfFile, String inFile) {
+    private void splitFile(Iterator<String> file, LinkedList<String> partOfFile, String inFile) {
         String lastValue = null;
         String temp;
         while (file.hasNext()) {
             temp = file.next();
             if (!temp.contains(" ")) {
-                if (!isCorrectData(lastValue, temp)) {
-                    System.out.println("The input file " + inFile + " is incorrectly sorted. Line: " + temp);
-                    if (partOfFile.size() > 0) {
+                if (!isCorrectData(lastValue, temp, dataType)) {
+                    System.out.println("The input file " + inFile + " is incorrectly sorted. String with value: " + temp);
+                    if (!partOfFile.isEmpty()) {
                         createPartOfFile(partOfFile, inFile);
                     }
                     break;
@@ -331,7 +212,8 @@ public class MergeSorting {
                     createPartOfFile(partOfFile, inFile);
                 }
             } else {
-                System.out.println("The line '" + temp + "' in file " + inFile + " contains a space");
+                System.out.println("The line '" + temp + "' in file " + inFile + " contains a space. " +
+                        "This line will not be taken into account when sorting");
             }
         }
     }

@@ -55,7 +55,7 @@
                             <jar>target/${project.artifactId}-${project.version}.jar</jar>
                             <errTitle>${product.title}</errTitle>
                             <classPath>
-                                <mainClass>MergeSorting</mainClass>
+                                <mainClass>StartApp</mainClass>
                                 <addDependencies>true</addDependencies>
                                 <preCp>anything</preCp>
                             </classPath>
